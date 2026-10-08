@@ -17,6 +17,7 @@ import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import { resolvePwshPath } from '@deepseek-ai/dsh-pwsh-local'
 import { LocalSandboxProvider } from '@deepseek-ai/dsh-sandbox-local'
 import { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { SandboxPwshExecutor } from '../src/index.ts'
 import type { ShellExecSpec, ShellExecution, ShellRunResult } from '@deepseek-ai/dsh-shell'
@@ -54,6 +55,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('pwsh-sandbox real ACL confinement
     escapeFile = join(scratchRoot, 'escaped.txt')
 
     const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(LocalSandboxProvider, {})
     await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: writableDir })
     await ctx.plugin(LocalSubprocessRuntime)
@@ -120,5 +122,22 @@ describe.skipIf(!isWin32 || !pwshAvailable())('pwsh-sandbox real ACL confinement
     expect(privateTemp?.startsWith(tmpdir())).toBe(true)
     expect(existsSync(privateTemp ?? '')).toBe(false)
     expect(result.sandbox).toEqual({ mode: 'workspace-write', denied: false, enforcement: 'partial' })
+  }, 60_000)
+
+  it('workspace-write with a session identity: the session-scoped private temp grant still runs the shell', async () => {
+    // The agent's own commands always carry a session identity, which selects
+    // the seam-materialized, revocable private temp capability instead of the
+    // agentless path the two cases above cover.
+    const policy = {
+      mode: 'workspace-write' as const,
+      workspaceRoot: writableDir,
+      sessionId: 'pwsh-sandbox-e2e-session' as NonNullable<SandboxExecutionPolicy['sessionId']>,
+    }
+    const result = await run(executor, executor.resolve({
+      command: "'SESSION-TEMP-PRESENT: ' + (Test-Path $env:TEMP)",
+      sandboxPolicy: policy,
+    }))
+    expect(result.exitCode, `stderr: ${result.stderr.text}`).toBe(0)
+    expect(result.stdout.text).toContain('SESSION-TEMP-PRESENT: True')
   }, 60_000)
 })
