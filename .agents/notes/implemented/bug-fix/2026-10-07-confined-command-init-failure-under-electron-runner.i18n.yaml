@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-07-confined-command-init-failure-under-electron-runner.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-10-07-confined-command-init-failure-under-electron-runner.md
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner:
+  en: b99f3103dbf08f10
+  zh: 7d996c0df3a9a222
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/problem:
+  en: 8eeace62704ae5cd
+  zh: 3186d9665f198c75
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/workaround:
+  en: 1194d40d803cce22
+  zh: 5fe538a8aa14772c
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/decision:
+  en: b51b93a9c1d97fc6
+  zh: 2c516d47f3274fdb
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/deferred:
+  en: 99f88e0bfb62552f
+  zh: 35c73c7d39530d18
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/alternatives-considered:
+  en: ce92892805472fb3
+  zh: c07fa0fede290c49
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/testing:
+  en: a5b0fa74e676abcb
+  zh: 1ea6f6d44e88562a
+/agent-note-a-confined-command-dies-with-0xc0000142-when-an-electron-host-runs-the-sandbox-runner/consequences:
+  en: 744c7e5b2b5e7363
+  zh: 727a7a3adf1d20c3

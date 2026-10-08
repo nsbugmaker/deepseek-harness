@@ -45,6 +45,7 @@ kind: "package-reference"
 | `runnerCommand` | `[]` | 自定义 runner argv；会追加 bwrap 兼容的 profile 参数，断言完全强制执行，并跳过内置选择与探测 |
 | `runnerFailureSignatures` | `[]` | 识别自定义 runner 自身失败方言的不区分大小写 stderr 子串；与 `runnerCommand` 搭配必需 |
 | `probeTimeoutMs` | `5,000` | 每次竞争 runner 候选功能探测的超时时间 |
+| `runnerInterpreter` | 宿主可执行文件 | 运行平台 runner 前缀的解释器；介于两者之间会采用 `DSH_SANDBOX_RUNNER_NODE`。Electron 宿主必须把它指向真正的 Node：作为 runner 时它无法创建受限令牌子进程——该子进程会在 DLL 初始化阶段以 `0xC0000142` 死亡 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-sandbox-local)是每个受支持字段及其 JSDoc 的穷尽式真源。
 

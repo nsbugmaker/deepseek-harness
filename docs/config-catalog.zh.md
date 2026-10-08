@@ -2464,6 +2464,17 @@ export interface Config {
   runnerFailureSignatures?: string[]
   /** Positive timeout for each functional probe; zero would mean unbounded to Node. */
   probeTimeoutMs?: number
+  /**
+   * Interpreter for the platform runner prefix, which the doc comment on
+   * {@link LocalSandboxProvider.windowsAclRunnerInvocation} keeps as
+   * `[interpreter, entry, ...]`. Empty means "the host executable"
+   * (`process.execPath`), and `DSH_SANDBOX_RUNNER_NODE` is honored in between.
+   * An Electron host must point this at a real Node: the windows-acl runner
+   * derives the restricted token and creates the confined child, and an
+   * Electron-as-Node runner cannot start that child — it dies inside DLL
+   * initialization with `0xC0000142`, before the command runs.
+   */
+  runnerInterpreter?: string
 }
 ```
 <!-- END GENERATED config-catalog:@deepseek-ai/dsh-sandbox-local -->
