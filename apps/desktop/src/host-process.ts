@@ -196,7 +196,7 @@ export class DesktopHostProcess {
       ...this.packageManager === undefined ? [] : [this.packageManager.pnpm, this.packageManager.nodeBin],
     ], {
       cwd: this.projectDir,
-      env: desktopNodeEnvironment(this.node, undefined, this.environment),
+      env: desktopNodeEnvironment(this.node, undefined, this.environment, this.primaryRuntime),
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     })
     this.child = child

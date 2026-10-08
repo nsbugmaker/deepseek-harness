@@ -14,11 +14,18 @@ import { installDesktopUpdateTaskControl } from './update-tasks.ts'
 import { installDesktopQuitInspection } from './quit-inspection.ts'
 import { installPlatformSessionPublisher } from './platform-session.ts'
 import { installOfficeEngineResolution } from './office-engine.ts'
+import { installSandboxRunnerInterpreter } from './sandbox-interpreter.ts'
 
 async function main(): Promise<void> {
   const runtimeDir = process.argv[2] as string
   const projectDir = process.argv[3] as string
+  // argv[4] is the bundled primary runtime (host-process.ts always passes it,
+  // defaulting to the runtime's `../runtime/primary-runtime` sibling). It — not
+  // the prepared project tree — is what carries the Node executable the sandbox
+  // runner prefix must use.
+  const primaryRuntime = process.argv[4] ?? join(runtimeDir, '..', 'runtime', 'primary-runtime')
   installOfficeEngineResolution(runtimeDir)
+  installSandboxRunnerInterpreter(primaryRuntime, runtimeDir)
   const installAnchor = join(runtimeDir, 'node_modules', '@deepseek-ai', 'dsh', 'package.json')
   const profile = loadProfileDirectory('dsh', projectDir, installAnchor)
   reportSkippedBundles('dsh', profile)
