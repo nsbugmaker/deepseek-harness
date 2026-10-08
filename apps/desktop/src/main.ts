@@ -1098,6 +1098,12 @@ async function main(): Promise<void> {
       if (quitting || shellInstallerOwnsQuit || sessionEnding) return
       event.preventDefault()
       if (updateDialog.isOpen) { updateDialog.focus(); return }
+      // 2026-10-08: closing hides into the tray, but the tray icon does not register on every
+      // Windows host (Electron logs notify_icon.cc failures and no icon ever appears), which
+      // strands a hidden process with no way back to it. Closing therefore quits through the same
+      // path as the application menu and the tray entry. Set DSH_DESKTOP_HIDE_ON_CLOSE=1 to
+      // restore hide-to-tray on hosts where the icon does register.
+      if (process.env.DSH_DESKTOP_HIDE_ON_CLOSE !== '1') { app.quit(); return }
       const hide = (): void => {
         if (!quitting && !shellInstallerOwnsQuit && !sessionEnding && !window.isDestroyed()) hideMainWindow(window)
       }
@@ -1246,8 +1252,10 @@ async function main(): Promise<void> {
       void (backend.state.phase === 'ready' ? openInitialWindow() : navigateMain(applicationUrl)).catch((error: unknown) => { reportFatal(error, 'main') })
       return
     }
-    // Startup and sign-out select the visible window before activation may reveal the workspace.
-    if (window === mainWindow && !enteredWorkspace) return
+    // Startup and sign-out select the visible window before activation may reveal the workspace,
+    // but an already hidden window must still come back: the tray icon can be missing, and a later
+    // launch (or a dsh://open) is the documented way back to it.
+    if (window === mainWindow && !enteredWorkspace && window.isVisible()) return
     if (window.isMinimized()) window.restore()
     window.show()
     window.focus()

@@ -85,7 +85,11 @@ export function installWindowsMenu(): { update(): void; dispose(): void } {
     return button
   }
   const buttons = [createButton('application', 0), createButton('edit', 1)] as const
-  shadow.append(style, bar)
+  // The notice shares the menubar's fixed caption row, so it follows the Desktop-owned
+  // menu offset instead of the Web client's titlebar geometry.
+  const notice = document.createElement('span')
+  notice.dataset.windowsMenuNotice = ''
+  shadow.append(style, bar, notice)
   const mount = (): void => {
     // AppFrame owns this seat; boot readiness alone precedes the rendered application.
     if (document.querySelector('[data-shell-overlay]') === null) return
@@ -100,6 +104,7 @@ export function installWindowsMenu(): { update(): void; dispose(): void } {
     bar.setAttribute('aria-label', messages.menuBar)
     buttons[0].textContent = messages.application
     buttons[1].textContent = messages.edit
+    notice.textContent = messages.peakHoursNotice
   }
   update()
   return {
