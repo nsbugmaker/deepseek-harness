@@ -217,7 +217,7 @@ describe('web e2e: long Chat interaction contract', () => {
     const markPitch = () => turnNavigation.getByRole('button').evaluateAll(buttons => (
       buttons[1]!.getBoundingClientRect().top - buttons[0]!.getBoundingClientRect().top
     ))
-    expect(await markPitch()).toBe(10)
+    expect(await markPitch()).toBe(16)
 
     const loadEarlier = page.getByRole('button', { name: 'Load earlier', exact: true })
     const loadedRows = page.locator('[data-chat-flow-key]')
@@ -228,7 +228,7 @@ describe('web e2e: long Chat interaction contract', () => {
     await page.mouse.wheel(0, -FIXTURE_TURNS * 10)
     await expect.poll(() => railScroller.evaluate(element => element.scrollTop)).toBe(0)
     await firstTurnButton.waitFor({ state: 'visible' })
-    expect(await markPitch()).toBe(10)
+    expect(await markPitch()).toBe(16)
     // Activating the still-unloaded oldest mark pages the rest in and lands
     // on the turn's own row.
     await firstTurnButton.focus()
