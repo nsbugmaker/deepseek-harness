@@ -107,10 +107,20 @@
 /* Selection still sets data-selected for details linkage; no outline —
    tool rows match Think chrome (no selected ring). */
 
+/* History replay: the swimming mark and its caption share one row, in the
+   loading ink the hint already used. */
 .hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--dsw-alias-label-tertiary);
   font-size: var(--dsh-content-font-size-secondary, 13px);
   line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
+}
+
+/* The mark keeps its own size inside the row and inherits the hint's ink. */
+.hintMark {
+  flex: none;
 }
 
 .running {

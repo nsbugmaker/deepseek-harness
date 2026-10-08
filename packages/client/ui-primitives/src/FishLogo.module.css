@@ -1,0 +1,35 @@
+/* Continuous swim (the loading treatment for the mark). A slow sway about the
+   body center — the head (left) lifts as the whale rises, then settles back
+   with a small counter-tilt, like treading water. Negative rotation = head up
+   (the head is the left half; origin 50% 60%). The 1.6s period matches the
+   SMIL `d` morph so pose and curve deformation read as one breath. */
+.swim {
+  /* The morph's curves poke slightly past the viewBox edges, so clipping would
+     slice the tail mid-wag. */
+  overflow: visible;
+  transform-origin: 50% 60%;
+  animation: fish-swim 1.6s ease-in-out infinite;
+}
+
+@keyframes fish-swim {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  35% {
+    transform: rotate(-4deg) translate(-0.4px, -0.9px);
+  }
+
+  70% {
+    transform: rotate(1.6deg) translate(0.3px, 0.2px);
+  }
+}
+
+/* Reduced motion keeps the static mark; the `d` morph is suppressed at render
+   time, this is the other half of the same guarantee. */
+@media (prefers-reduced-motion: reduce) {
+  .swim {
+    animation: none;
+  }
+}

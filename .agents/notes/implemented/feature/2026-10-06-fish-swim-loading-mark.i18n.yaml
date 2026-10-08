@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-06-fish-swim-loading-mark.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-06-fish-swim-loading-mark.md
+/agent-note-the-fish-mark-swims-as-the-hero-and-history-loading-treatment:
+  en: da797896e418253f
+  zh: 851830233a7e8ed8
+/agent-note-the-fish-mark-swims-as-the-hero-and-history-loading-treatment/problem:
+  en: 6e9c893c6def8d48
+  zh: e55d3a151f3f9193
+/agent-note-the-fish-mark-swims-as-the-hero-and-history-loading-treatment/decision:
+  en: 9c817ab819793932
+  zh: 3fcd34ed7b47344c
+/agent-note-the-fish-mark-swims-as-the-hero-and-history-loading-treatment/alternatives-considered:
+  en: ab634c227baabb8d
+  zh: f5d818c36198b172
+/agent-note-the-fish-mark-swims-as-the-hero-and-history-loading-treatment/consequences:
+  en: a0bd841a35b26abc
+  zh: 89e331f9ab608319

@@ -39,6 +39,7 @@ import { serveWebDocument, authenticateWebHost, forwardWebRequest } from './web-
 import { DesktopFatalRecovery } from './fatal-recovery.ts'
 import { pruneCrashReports, RendererConsoleTail, writeCrashReport, type CrashReportSource } from './crash-report.ts'
 import { openWelcomeWindow } from './welcome-window.ts'
+import { closeSplashWindow, openSplashWindow } from './splash-window.ts'
 import { WELCOME_IPC, needsWelcome, type WelcomeNotice } from './welcome-api.ts'
 import { connectDesktopWelcome, type DesktopWelcomeBackend } from './welcome-backend.ts'
 import { DesktopUpdateJournal } from './update-journal.ts'
@@ -62,6 +63,11 @@ import { DesktopBackgroundNotice } from './background-notice.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => {}
+/**
+ * Set once `main` owns a splash window. A fatal startup error takes the screen
+ * over with its report, so the splash leaves first.
+ */
+let dismissStartupSplash = (): void => {}
 let shuttingDown = false
 /**
  * Set by quit entries that must not ask: crash recovery exit and restart, and the
@@ -121,6 +127,7 @@ function persistCrashReport(error: unknown, source: CrashReportSource): Promise<
 
 function reportFatal(error: unknown, source: CrashReportSource): void {
   console.error(error)
+  dismissStartupSplash()
   if (shuttingDown) {
     // No dialog during shutdown, but the report still records what failed on the way out.
     void persistCrashReport(error, source)
@@ -342,6 +349,24 @@ async function main(): Promise<void> {
   let mainWindow: BrowserWindow | undefined
   let welcomeWindow: BrowserWindow | undefined
   let enteredWorkspace = false
+  /**
+   * The startup splash owns the screen until the first real window is visible:
+   * spawning the Host takes seconds, and an empty desktop meanwhile reads as a
+   * failed launch. A dismissal that lands before the document finishes loading
+   * closes the window as soon as it appears.
+   */
+  let splashWindow: BrowserWindow | undefined
+  let splashDismissed = false
+  const dismissSplash = (): void => {
+    splashDismissed = true
+    closeSplashWindow(splashWindow)
+    splashWindow = undefined
+  }
+  dismissStartupSplash = dismissSplash
+  void openSplashWindow(nativeTheme.shouldUseDarkColors).then((window) => {
+    if (splashDismissed || quitting) { closeSplashWindow(window); return }
+    splashWindow = window
+  }, (error: unknown) => { console.warn('desktop splash: document failed to load', error) })
   // NSIS passes --updated when it launches the application after installation.
   let raiseAfterUpdate = process.platform === 'win32' && process.argv.includes('--updated')
   let shellInstallerOwnsQuit = false
@@ -1115,6 +1140,7 @@ async function main(): Promise<void> {
     const window = mainWindow ?? createMainWindow()
     await navigateMain(applicationUrl)
     if (isQuitting() || recovery.active || window.isDestroyed()) return
+    dismissSplash()
     if (activate) window.show()
     else window.showInactive()
     enteredWorkspace = true
@@ -1137,6 +1163,7 @@ async function main(): Promise<void> {
     if (quitting) return Promise.resolve()
     if (welcomeWindow !== undefined && !welcomeWindow.isDestroyed()) {
       if (!welcomeWindow.isVisible()) void track('auth_page_view', {})
+      dismissSplash()
       welcomeWindow.show()
       welcomeWindow.focus()
       return Promise.resolve()
@@ -1174,6 +1201,7 @@ async function main(): Promise<void> {
         },
         skip: enterWorkspace,
       })
+      dismissSplash()
       const window = welcomeWindow
       window.once('closed', () => {
         void welcomeBackend?.account.state().then((state) => {
@@ -1241,6 +1269,7 @@ async function main(): Promise<void> {
   const finishQuit = (): void => {
     quitting = true
     shuttingDown = true
+    dismissSplash()
     updateJournal?.action('quit-requested')
     quitConfirmation.dispose()
     backgroundNotice?.dispose()
@@ -1302,6 +1331,7 @@ async function main(): Promise<void> {
     }, (state) => {
       if (state.error !== 'authentication-required') policyAuthenticationQueued = false
       if (state.blocking) {
+        dismissSplash()
         for (const controller of ordinaryDialogs) controller.abort()
         if (!wasBlocking) updateDialog.cancel()
       }

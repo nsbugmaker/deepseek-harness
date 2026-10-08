@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
+import { FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
@@ -196,6 +197,15 @@ export function ConversationContent(props: ConversationContentProps) {
     >
       <div className={css.scrollBody} data-conversation-scroll="">
         {sessionId === undefined ? null : <Views />}
+        {/* Settling: the session is replaying and the hero/docked choice is not
+            yet known, so the column holds the loading mark alone. It yields to
+            a mounted view area (see .settling), whose own surface owns that
+            case. */}
+        {phase === 'settling' && (
+          <div className={css.settling} role="status" aria-label={t('session.loading')}>
+            <FishLogo size={34} swim />
+          </div>
+        )}
         {composerSeat}
       </div>
       <WidthControls container={body} phase={phase} />

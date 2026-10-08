@@ -543,3 +543,20 @@ button.crumb:hover {
 .embeddedBody[data-content-phase='settling'] .composerSeat {
   visibility: hidden;
 }
+
+/* The settling loading mark: the column is otherwise empty, so the mark centers
+   in it at the shared loading ink (the spinner's tertiary). It yields to a
+   mounted view area — a session that already renders a view keeps that view's
+   own loading surface, so one region never shows two treatments. */
+.settling {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.scrollBody:has(.viewArea) .settling {
+  display: none;
+}

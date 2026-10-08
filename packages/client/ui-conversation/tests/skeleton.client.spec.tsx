@@ -395,6 +395,10 @@ describe('Hero chrome', () => {
     expect(brandMarkOwner.size).toBe(34)
     expect(brandMarkOwner.className).toBeTypeOf('string')
     expect(renderSlot.mock.calls[0]?.[2]?.fallback).toBeTruthy()
+    // The fallback mark treads water on its own: no hover is required for the
+    // hero's motion, and the same treatment carries the loading surfaces.
+    const hero = render(<>{renderSlot.mock.calls[0]?.[2]?.fallback}</>)
+    expect(hero.container.querySelector('animate')).not.toBeNull()
   })
 })
 
@@ -590,6 +594,11 @@ describe('ConversationRoot resident composer', () => {
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('settling')
     expect(b.view.queryByTestId('hero-headline')).toBeNull()
+    // The otherwise empty column holds the swimming mark, named for assistive
+    // tech, instead of flashing the wrong chrome.
+    const mark = b.view.container.querySelector('[role="status"]')
+    expect(mark?.getAttribute('aria-label')).toBe('载入会话…')
+    expect(mark?.querySelector('animate')).not.toBeNull()
   })
 
   it('settling phase: a session the list has no row for settles conservatively', () => {

@@ -4023,7 +4023,12 @@ describe('ChatView', () => {
     expect(view.getByText(/历史加载失败：boom/)).toBeTruthy()
     const loading = makeHarness({}, { openState: 'loading' })
     const lv = render(<loading.ChatView {...loading.props} />)
-    expect(lv.getByText('载入历史…')).toBeTruthy()
+    // The replay caption carries the swimming mark: history loading is the one
+    // surface here that animates, and it stops with the caption.
+    const loadingHint = lv.getByText('载入历史…')
+    expect(loadingHint.querySelector('animate')).not.toBeNull()
+    act(() => { loading.setSession({ openState: 'open' }) })
+    expect(lv.queryByText('载入历史…')).toBeNull()
   })
 
   it('renders command nodes as durable rows: settled text, error state, executing spinner, run-less soft-fall', () => {

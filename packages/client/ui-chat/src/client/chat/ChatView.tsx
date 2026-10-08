@@ -8,7 +8,7 @@ import type {
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  Button, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal,
+  Button, FishLogo, IconChevronDownOutlineRegular, MarkdownDelegateProvider, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
@@ -240,7 +240,12 @@ export function ChatView({
       <div className={css.root} data-chat-following-tail={scroll.followingTail ? '' : undefined}>
         <div ref={scroll.listRef} className={css.scroll}>
           <div ref={scroll.columnRef} className={css.column} data-chat-flow="">
-            {openState === 'loading' && <div className={css.hint}>{t('chat.loadingHistory')}</div>}
+            {openState === 'loading' && (
+              <div className={css.hint}>
+                <FishLogo size={14} className={css.hintMark} swim />
+                {t('chat.loadingHistory')}
+              </div>
+            )}
             {openState === 'error' && openError !== null && (
               <div className={css.openError}>
                 {t('chat.loadError', { message: openError.message, code: openError.code })}

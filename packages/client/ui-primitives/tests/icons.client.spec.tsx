@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   IconAlarmClockOutlineRegular, IconApiOutlineRegular, IconArchiveOutlineRegular, IconFolderCloseRegular,
   IconGoalOutlineRegular, IconSendOutlineRegular,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 // Icon components all share the IconProps signature; the barrel also exports
 // non-icon atoms (different props shapes), so filter by prefix BEFORE typing.
@@ -132,6 +135,30 @@ describe('FishLogo', () => {
     expect(container.querySelectorAll('path')).toHaveLength(1)
     expect(container.innerHTML).toContain('currentColor')
     expect(container.innerHTML).not.toContain('M0 0L23.16')
+  })
+
+  it('rides its outline through the swim cycle only when the loading treatment is asked for', () => {
+    // A resting mark never animates; swim is the loading state and nothing else.
+    expect(render(<primitives.FishLogo />).container.querySelector('animate')).toBeNull()
+    const { container } = render(<primitives.FishLogo swim />)
+    const animate = container.querySelector('animate')!
+    expect(animate.getAttribute('attributeName')).toBe('d')
+    expect(animate.getAttribute('repeatCount')).toBe('indefinite')
+    // Resting path, tail up, resting, tail down, resting: five frames per cycle.
+    const frames = animate.getAttribute('values')!.split(';')
+    expect(frames).toHaveLength(5)
+    expect(frames[0]).toBe(frames[4])
+    expect(frames[0]).not.toBe(frames[1])
+    expect(frames[2]).toBe(frames[0])
+  })
+
+  it.each([true, false])('follows a stated reduced-motion preference (reduced=%s)', (reduced) => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: reduced })))
+    const { container } = render(<primitives.FishLogo swim />)
+    expect(container.querySelector('animate') === null).toBe(reduced)
+    // The sway class stays either way: the stylesheet, not the renderer, drops
+    // the animation, so a mid-session preference change still reaches it.
+    expect(container.querySelector('svg')?.getAttribute('class')).toContain('swim')
   })
 })
 
