@@ -39,9 +39,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Services required by account settings. */
 export const inject = ['slots', 'locale', 'remote', 'remote.account', 'remote.session', 'theme', 'configForms']
-/** Register account UI only in the Desktop renderer. @param ctx - client plugin context. */
+/** Register the account UI in Desktop and its read-only projection in a plain browser. @param ctx - client plugin context. */
 export function apply(ctx: Context): void {
-  if (!('dshDesktop' in globalThis)) return
+  // The preload bridge is the only surface that can start a Platform sign-in, so a
+  // plain browser only projects the account the Host already holds.
+  const desktop = 'dshDesktop' in globalThis
   ctx.effect(() => ctx.locale.register('settings.account', { en, zh }), 'account: dictionaries')
   const t = ctx.locale.bind('settings.account')
   const page = globalThis as Partial<Record<typeof CONTACT_CONFIG_GLOBAL, unknown>>
@@ -105,6 +107,30 @@ export function apply(ctx: Context): void {
     return request
   }
   ctx.effect(() => () => { revision++ }, 'account: details request lifetime')
+  /**
+   * Project the model API key's wallet into a plain browser when no Platform grant is
+   * stored. Desktop surfaces keep their sign-in card, so only a read-only client asks.
+   * @returns after the optional read settles.
+   */
+  const readApiKeyBalance = async (): Promise<void> => {
+    if (desktop || snapshot.view?.status === 'credential-stored') return
+    const unavailable = (): void => {
+      publish({ ...snapshot, details: { ...snapshot.details, balance: { status: 'failed' } } })
+    }
+    try {
+      const result = await ctx.remote.account.getBalance(client())
+      if (!result.ok) {
+        console.info('[account] api-key balance rejected', { code: result.error.code, message: result.error.message })
+        unavailable()
+        return
+      }
+      if (result.value !== null) publish({ ...snapshot, details: { ...snapshot.details, balance: result.value } })
+    } catch (error) {
+      // A transport failure is the same unavailable state a rejected read renders.
+      console.info('[account] api-key balance read failed', error instanceof Error ? error.message : String(error))
+      unavailable()
+    }
+  }
   const stream = ctx.remote.$stream<AccountView>({
     name: 'account', open: signal => ctx.remote.account.watch(signal), ended: () => new Error('account stream ended'),
   })
@@ -131,8 +157,13 @@ export function apply(ctx: Context): void {
         }
       })()
       void refresh()
+      void readApiKeyBalance()
     }
-  })().catch(() => { if (!disposed) publish({ ...snapshot, failed: true }) })
+  })().catch((error: unknown) => {
+    if (disposed) return
+    console.info('[account] state stream failed', error instanceof Error ? error.message : String(error))
+    publish({ ...snapshot, failed: true })
+  })
   const nativePlatform = (globalThis as typeof globalThis & { dshPlatform?: PlatformBridge }).dshPlatform
   // One request channel for the single native Platform view. It always exists
   // so every entry can observe whether a page is showing; only a native bridge
@@ -142,7 +173,7 @@ export function apply(ctx: Context): void {
   // One account refresh: the recharge/bonus wallet and the unnotified-bonus read,
   // whichever surface asks — a Settings entry, or returning from top-up. Both
   // reads are independent, and a concurrent refresh shares the in-flight request.
-  const refreshAccount = async (): Promise<void> => { await Promise.all([refresh(), notices.refresh()]) }
+  const refreshAccount = async (): Promise<void> => { await Promise.all([refresh(), notices.refresh(), readApiKeyBalance()]) }
   /**
    * Narrow the shared channel to one surface's post-return read: only a viewer
    * returning from top-up re-reads, so a superseded page or a plugin teardown
@@ -159,6 +190,7 @@ export function apply(ctx: Context): void {
     subscribeSessionExpired: listener => ctx.remote.$on('deepseek-account/session-expired', listener),
     subscribeModelSignInRequired: listener => ctx.remote.$on('deepseek-account/model-sign-in-required', listener),
     ...nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) },
+    readOnly: !desktop,
     refreshAccount,
     contactUs() {
       // Sample the account, build and environment before awaiting native information, so
@@ -211,7 +243,7 @@ export function apply(ctx: Context): void {
       try {
         const result = await ctx.remote.account.startSignIn(client(),
           transport?.streamBaseUrl !== undefined ? new URL(transport.streamBaseUrl).origin : window.location.origin,
-          'desktop')
+          desktop ? 'desktop' : 'web')
         if (!result.ok) throw new Error('account start failed')
       } catch (error) {
         publish({ ...snapshot, loginFailed: true })
@@ -230,7 +262,7 @@ export function apply(ctx: Context): void {
       throw result.error
     },
   }
-  if ('dshDesktop' in globalThis) {
+  if (desktop) {
     const controller = new DesktopOnboardingController(
       ctx.configForms.get<OnboardingSettings>(DESKTOP_ONBOARDING_NAMESPACE),
       ctx.configForms.get<{ transcriptView?: TranscriptViewMode | null; performanceUsage: 'compact' | 'detailed' }>('ui-chat'),
@@ -262,17 +294,21 @@ export function apply(ctx: Context): void {
       }),
     }, DesktopOnboardingEntry))
   }
-  ctx.slots.inject('settings.models.sign-in', () => ctx.slots.register({
-    name: 'settings.models.sign-in', locale: 'settings.account', inject: () => operations,
-  }, AccountOnboarding))
-  ctx.slots.inject('shell.quota-notice', () => ctx.slots.register({
-    name: 'shell.quota-notice', locale: 'settings.account',
-    select: owner => owner.code === 'ACCOUNT_QUOTA' ? owner : null,
-    inject: (): AccountQuotaNoticeInjected => ({
-      hooks: { account: operations.hooks.account, platformPage: platformPages },
-      ...nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) },
-    }),
-  }, AccountQuotaNotice))
+  if (desktop) {
+    // The model credential step and the quota notice both offer a Platform action
+    // that needs the Desktop login surface.
+    ctx.slots.inject('settings.models.sign-in', () => ctx.slots.register({
+      name: 'settings.models.sign-in', locale: 'settings.account', inject: () => operations,
+    }, AccountOnboarding))
+    ctx.slots.inject('shell.quota-notice', () => ctx.slots.register({
+      name: 'shell.quota-notice', locale: 'settings.account',
+      select: owner => owner.code === 'ACCOUNT_QUOTA' ? owner : null,
+      inject: (): AccountQuotaNoticeInjected => ({
+        hooks: { account: operations.hooks.account, platformPage: platformPages },
+        ...nativePlatform === undefined ? {} : { openPlatformPage: platformPageOpener(refreshAccount) },
+      }),
+    }, AccountQuotaNotice))
+  }
   if (nativePlatform !== undefined) {
     ctx.slots.inject('shell.overlay', () => ctx.slots.register({
       name: 'shell.overlay', id: 'account.platform-page', locale: 'settings.account',
@@ -282,9 +318,26 @@ export function apply(ctx: Context): void {
       }),
     }, AccountPlatformHost))
   }
-  ctx.slots.inject('settings.launcher', () => ctx.slots.register({
-    name: 'settings.launcher', locale: 'settings.account', inject: () => operations,
-  }, AccountMenu))
+  ctx.slots.inject('settings.launcher', () => {
+    // Desktop offers its launcher before sign-in because its menu starts the login.
+    // A plain browser replaces the shell's Settings trigger only once the Host holds
+    // an account, so a signed-out browser keeps the standard trigger.
+    let unregister: (() => void) | undefined
+    const update = (): void => {
+      if (!desktop && snapshot.view?.status !== 'credential-stored'
+        && snapshot.details?.balance === undefined) {
+        unregister?.()
+        unregister = undefined
+        return
+      }
+      unregister ??= ctx.slots.register({
+        name: 'settings.launcher', locale: 'settings.account', inject: () => operations,
+      }, AccountMenu)
+    }
+    listeners.add(update)
+    update()
+    return () => { listeners.delete(update); unregister?.() }
+  })
   ctx.slots.inject('settings.section', () => {
     let unregister: (() => void) | undefined
     const update = () => {

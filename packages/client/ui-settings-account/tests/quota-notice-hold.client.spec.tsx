@@ -63,6 +63,7 @@ function sectionOperations(account: AccountSnapshot, pages: PlatformPages): Acco
       theme: { getSnapshot: () => theme, subscribe: () => () => {} },
     },
     openPlatformPage: pages.open,
+    readOnly: false,
     refreshAccount: async () => {},
     bonusNoticeShown: () => {}, bonusNoticeDismissed: () => {},
     hasRunningAccountTasks: async () => false,

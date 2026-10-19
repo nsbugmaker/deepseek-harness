@@ -520,36 +520,19 @@ describe.skipIf(MODE === 'record')('web e2e: bonus notice', () => {
     expect(reloadAdded).toEqual([])
     await noticeCards(page).getByRole('button', { name: '关闭', exact: true }).click()
 
-    // A failed wallet read still leaves both balance rows reaching the Platform entry.
+    // A failed wallet read keeps both balance rows, without a Platform link.
     platform.setKeepUnnotified(false)
     platform.clearUnnotified()
     platform.setFailSummary(true)
     const failedGetsBefore = platform.gets.length
     const failedSummariesBefore = platform.summaries.length
-    const failedUsagesBefore = (await platformCalls(page)).filter(call => call === 'open:usage').length
     await openSettings(page, 'zh')
     const failedSettings = page.getByRole('dialog', { name: '设置', exact: true })
     await failedSettings.waitFor()
-    const failedLinks = failedSettings.getByRole('link', { name: '前往开放平台查看', exact: true })
-    await expect.poll(() => failedLinks.count(), { timeout: 30_000 }).toBe(2)
+    const failedRows = failedSettings.getByText('暂不可用', { exact: true })
+    await expect.poll(() => failedRows.count(), { timeout: 30_000 }).toBe(2)
     await expect.poll(() => platform.summaries.length, { timeout: 30_000 }).toBe(failedSummariesBefore + 1)
-    const failedHrefs = (await failedLinks.evaluateAll(nodes => nodes.map(node => node.getAttribute('href'))))
-      .map(href => String(href).replace(platform.origin, '{{origin}}'))
-    observations.push(`failed.links count=${String(await failedLinks.count())} hrefs=${failedHrefs.join(',')}`)
-    expect(failedHrefs).toEqual(['{{origin}}/usage', '{{origin}}/usage'])
-    // Returning from usage refreshes nothing, because only a payment changes the account.
-    for (const index of [0, 1]) {
-      await failedLinks.nth(index).click()
-      const usageOverlay = page.getByRole('dialog', { name: '返回 DeepSeek Harness', exact: true })
-      await usageOverlay.waitFor()
-      await usageOverlay.getByRole('button', { name: '返回 DeepSeek Harness', exact: true }).click()
-      await usageOverlay.waitFor({ state: 'detached', timeout: 30_000 })
-    }
-    const failedUsages = (await platformCalls(page)).filter(call => call === 'open:usage').length - failedUsagesBefore
-    observations.push(`failed.reached usages=${String(failedUsages)} gets=${String(platform.gets.length - failedGetsBefore)} summaries=${String(platform.summaries.length - failedSummariesBefore)}`)
-    expect(failedUsages).toBe(2)
-    expect(platform.gets.length).toBe(failedGetsBefore + 1)
-    expect(platform.summaries.length).toBe(failedSummariesBefore + 1)
+    observations.push(`failed.rows count=${String(await failedRows.count())} links=${String(await failedSettings.getByRole('link', { name: '暂不可用', exact: true }).count())} gets=${String(platform.gets.length - failedGetsBefore)} summaries=${String(platform.summaries.length - failedSummariesBefore)}`)
     platform.setFailSummary(false)
     await page.keyboard.press('Escape')
     await failedSettings.waitFor({ state: 'detached', timeout: 30_000 })

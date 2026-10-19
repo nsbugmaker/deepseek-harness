@@ -8,9 +8,9 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { z } from 'zod'
 import { DeepSeekAccount, installAccountTaskCancellation, mergePlatformCookies, platformClientHeaders, platformWireLocale, type AccountBonusBatch, type AccountBonusOrderId, type AccountClientMetadata, type AccountDetails, type AccountUserId, type AccountView, type PlatformSession, type SignInAttemptId, type SignInAttemptView } from '@deepseek-ai/dsh-deepseek-account'
-import { credentialKey } from '@deepseek-ai/dsh-credentials'
+import { credentialKey, credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { AuthorizationSession } from '@deepseek-ai/dsh-authorization'
-import { profile, readAccountDetail, readUnnotifiedBonuses, sendBonusNotified } from './details.ts'
+import { apiKeyBalance, profile, readAccountDetail, readUnnotifiedBonuses, sendBonusNotified } from './details.ts'
 import { revokeAccount, type LogoutRetryPolicy } from './logout.ts'
 import { AccountUnauthorizedError, PlatformAuthError, platformHeaders, platformOrigin, browserUrl, requestPlatform, initialization, exchange, loginOrigin } from './protocol.ts'
 
@@ -202,8 +202,50 @@ export class PlatformAccount extends DeepSeekAccount {
     return cached ?? result
   }
 
-  override getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {
-    return this.getDetail('balance', this.detailHeaders(client))
+  override async getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {
+    const details = await this.getDetail('balance', this.detailHeaders(client))
+    if (details !== null) return details
+    return await this.readApiKeyBalance()
+  }
+
+  /**
+   * Read the wallet behind the model API key when no Platform grant is stored. The
+   * inference origin reports the same account's topped-up and granted amounts for
+   * that key; a missing key, an unsupported endpoint, or a rejected key yields no
+   * balance or a failed read instead of a zero.
+   * @returns wallet amounts, a failed outcome, or null when no API key is stored.
+   */
+  private async readApiKeyBalance(): Promise<AccountDetails['balance'] | null> {
+    if (this.closed) return null
+    const stored = await this.ctx.credentials.resolve(credentialRef('DEEPSEEK_API_KEY'))
+    if (stored === undefined || stored.value.length === 0) {
+      console.info('[deepseek-account] api-key balance skipped', { reason: 'no-key' })
+      return null
+    }
+    try {
+      const response = await fetch(`${this.inferenceOrigin}/user/balance`, {
+        headers: { authorization: `Bearer ${stored.value}` },
+        // A credentialed request never follows a redirect to another origin.
+        redirect: 'error',
+        signal: AbortSignal.timeout(this.balanceTimeout),
+      })
+      if (!response.ok) {
+        console.info('[deepseek-account] api-key balance rejected', { status: response.status })
+        return { status: 'failed' }
+      }
+      const balance = apiKeyBalance(await response.json())
+      console.info('[deepseek-account] api-key balance ready', {
+        wallets: balance.value.length, bonusWallets: balance.bonusWallets.length,
+      })
+      return balance
+    } catch (error) {
+      // A missing endpoint, rejected key, redirect, malformed payload, or timeout is one failed read.
+      console.info('[deepseek-account] api-key balance failed', {
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+      })
+      return { status: 'failed' }
+    }
   }
 
   override async getUnnotifiedBonuses(client: AccountClientMetadata): Promise<AccountBonusBatch | null> {

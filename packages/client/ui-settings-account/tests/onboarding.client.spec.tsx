@@ -31,6 +31,7 @@ it('claims onboarding while loading, offers API key fallback, and completes afte
     useTheme: <T,>(select: (snapshot: ThemeSnapshot) => T) => select(theme),
     start: vi.fn(async () => {}), cancel: vi.fn(async () => {}), signOut: vi.fn(async () => {}),
     contactUs: vi.fn(), t: makeTranslate(en),
+    readOnly: false,
     refreshAccount: vi.fn(async () => {}), bonusNoticeShown: vi.fn(), bonusNoticeDismissed: vi.fn(),
   }
   const view = render(<AccountOnboarding {...props} />)

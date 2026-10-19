@@ -6,6 +6,8 @@
 .avatar { display: flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: 50%;
   corner-shape: round; background: var(--dsw-alias-bg-skeleton); color: var(--dsw-alias-label-tertiary); }
 .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Balance-only launcher: the API-key wallet amount replaces the signed-out More copy. */
+.trigger[data-balance-only='true'] .label { font-weight: 500; font-variant-numeric: tabular-nums; }
 /* Signed-out launcher: a 32px More row carrying the 14px ellipsis. */
 .trigger[data-signed-out='true']:not([data-collapsed='true']) { height: 32px; padding: 6px 2px 6px 6px; line-height: 20px; }
 
@@ -42,9 +44,3 @@
 .balanceAmount { display: flex; flex-wrap: wrap; justify-content: flex-end; font-weight: 510; font-variant-numeric: tabular-nums; }
 .balanceAmount > span + span::before { content: ' + '; white-space: pre; }
 .balancePending { color: var(--dsw-alias-label-tertiary); }
-
-/* A failed wallet read keeps the same muted copy as the settings sheet, but as a
-   link to the Platform entry the balance rows share. */
-.balanceLink { color: var(--dsw-alias-label-tertiary); text-decoration: underline; text-underline-offset: 3px; }
-.balanceLink:hover { color: var(--dsw-alias-label-primary); }
-.balanceLink:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; border-radius: 4px; }

@@ -27,9 +27,10 @@ export class AccountController extends TypertRemoteService {
     return this.ctx.deepseekAccount.getProfile(client)
   }
   /**
-   * Query Platform recharge-wallet balances.
+   * Query recharge-wallet balances: the Platform grant's wallets, or the model API
+   * key's own wallet when no grant is stored.
    * @param client - identity of the requesting UI; the Host derives Platform request headers from it.
-   * @returns balance outcome, or null when the account grant is absent or changed.
+   * @returns balance outcome, or null when neither the account grant nor an API-key wallet is available.
    */
   @Remote
   getBalance(client: AccountClientMetadata): Promise<AccountDetails['balance'] | null> {

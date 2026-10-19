@@ -1,4 +1,4 @@
-/** Sidebar account launcher, wallet summary and locally authoritative sign-out action. */
+/** Sidebar account launcher, wallet summary and the sign-out action owned by the surface that signed in. */
 import { Big } from 'big.js'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -23,7 +23,7 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'
  */
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
-  useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, bonusNoticeShown, bonusNoticeDismissed,
+  useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, readOnly, bonusNoticeShown, bonusNoticeDismissed,
   contactUs, showLogin, start, cancel, t,
 }: AccountMenuProps) {
   const anchor = useRef<HTMLDivElement>(null)
@@ -50,6 +50,20 @@ export function AccountMenu({
   const wallets = details?.balance?.status === 'ready' ? details.balance.value : undefined
   const bonusWallets = details?.balance?.status === 'ready'
     ? details.balance.bonusWallets.filter(wallet => new Big(wallet.balance).gt(0)) : []
+  // A read-only browser projects the model API key's wallet without an account session.
+  const showBalance = signedIn || (readOnly && details?.balance !== undefined)
+  const balanceOnly = !signedIn && showBalance
+  // The launcher summarizes that wallet in one amount; the menu splits recharge and bonus.
+  const balanceTotal = (() => {
+    const balance = details?.balance
+    if (!balanceOnly || balance?.status !== 'ready') return undefined
+    const wallet = balance.value[0] ?? balance.bonusWallets[0]
+    if (wallet === undefined) return formatBalance('0', '¥')
+    const total = [...balance.value, ...balance.bonusWallets]
+      .filter(item => item.currency === wallet.currency)
+      .reduce((sum, item) => sum.plus(item.balance), new Big(0))
+    return formatBalance(total.toString(), wallet.currency === 'CNY' ? '¥' : '$')
+  })()
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const [busy, setBusy] = useState(false)
@@ -68,24 +82,29 @@ export function AccountMenu({
     {signedIn && account.notice && <AccountNoticeCard key={account.notice.orderId} notice={account.notice}
       anchor={anchor} title={t('bonusNoticeTitle')} closeLabel={t('close')}
       onShown={bonusNoticeShown} onDismiss={bonusNoticeDismissed} />}
-    <Menu open={open} side="top" portal autoFocus className={css.anchor} listClassName={signedIn ? undefined : css.signedOutMenu}
-      anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-signed-out={!signedIn} aria-label={t('menu')}
+    <Menu open={open} side="top" portal autoFocus className={css.anchor} listClassName={signedIn || balanceOnly ? undefined : css.signedOutMenu}
+      anchor={<button ref={trigger} type="button" className={css.trigger} data-collapsed={!wide} data-signed-out={!signedIn && !balanceOnly} data-balance-only={balanceOnly} aria-label={t('menu')}
         aria-haspopup="menu" aria-expanded={open} onClick={() => {
           // Opening the menu is one account read; toggling it closed is not a second one.
-          if (!open && signedIn) void refreshAccount()
+          if (!open && (signedIn || balanceOnly)) void refreshAccount()
           setOpen(value => !value)
         }}>
         {signedIn
           ? <span className={css.avatar}><AccountAvatar url={profile?.status === 'ready' ? profile.value.avatarUrl : null} /></span>
-          : <IconEllipsisOutlineMedium size={14} />}
-        {wide && <span className={css.label}>{signedIn ? label : t('more')}</span>}
+          : balanceOnly
+            ? <span className={css.avatar}><IconUserOutlineMedium size={16} /></span>
+            : <IconEllipsisOutlineMedium size={14} />}
+        {wide && <span className={css.label}>{signedIn ? label
+          : balanceOnly ? balanceTotal ?? t('balanceFailed')
+            : t('more')}</span>}
       </button>}
       items={[
         { id: 'settings', label: t('settings'), icon: <IconSettingsOutlineMedium size={16} />,
           ...(settingsShortcut === undefined ? {} : { shortcut: settingsShortcut }) },
         { id: 'contact', label: t('contactUs'), icon: <IconPaperPlaneOutlineMedium size={16} /> },
-        ...(signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
-          : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
+        ...(readOnly ? []
+          : signedIn ? [{ id: 'signout', label: t('signOut'), icon: <LogoutIcon />, disabled: busy }]
+            : [{ id: 'signin', label: t('signIn'), icon: <IconUserOutlineMedium size={16} /> }]),
       ]}
       onClose={() => { setOpen(false) }}
       onSelect={(id) => {
@@ -96,18 +115,18 @@ export function AccountMenu({
       }}>
       {/* Read-only wallet summary. The list renders children after its rows, so the
           stylesheet orders this block above them without changing the keyboard walk. */}
-      {signedIn && <div className={css.balance} role="presentation">
+      {showBalance && <div className={css.balance} role="presentation">
         <div className={css.balanceRow}>
           <span className={css.balanceLabel}>{t('balance')}</span>
-          {wallets !== undefined && wallets.length > 0
-            ? <span className={css.balanceAmount}>{wallets.map(wallet => <span key={wallet.currency}>
-              {formatBalance(wallet.balance, wallet.currency === 'CNY' ? '¥' : '$')}
-            </span>)}</span>
-            : details?.balance === undefined
+          {wallets === undefined
+            ? details?.balance === undefined
               ? <span className={css.balancePending}>{t('loading')}</span>
-              : <a className={css.balanceLink} href={account.view?.links.usageUrl} target="_blank" rel="noreferrer">
-                {t('balanceUnavailable')}
-              </a>}
+              : <span className={css.balancePending}>{t('balanceFailed')}</span>
+            : <span className={css.balanceAmount}>{wallets.length === 0
+              ? formatBalance('0', '¥')
+              : wallets.map(wallet => <span key={wallet.currency}>
+                {formatBalance(wallet.balance, wallet.currency === 'CNY' ? '¥' : '$')}
+              </span>)}</span>}
         </div>
         {bonusWallets.length > 0 && <div className={css.balanceRow}>
           <span className={css.balanceLabel}>{t('bonusBalance')}</span>
@@ -117,10 +136,10 @@ export function AccountMenu({
         </div>}
       </div>}
     </Menu>
-    {account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
+    {!readOnly && account.loginVisible && !account.onboarding && <SignInDialog account={account} colorScheme={colorScheme}
       start={start} cancel={cancel} t={t}
       close={() => { showLogin(false) }} useApiKey={() => { showLogin(false); openOnboarding('deepseek-official') }} />}
-    {signedIn && signOutImpact !== undefined && <SignOutDialog running={signOutImpact} signOut={signOut}
+    {!readOnly && signedIn && signOutImpact !== undefined && <SignOutDialog running={signOutImpact} signOut={signOut}
       close={() => { setSignOutImpact(undefined) }} t={t} />}
   </div>
 }

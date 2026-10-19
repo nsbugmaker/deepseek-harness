@@ -17,6 +17,7 @@ import { browserUrl, platformHeaders, platformOrigin, loginOrigin } from '../src
 const cleanups: Array<() => Promise<unknown>> = []
 afterEach(async () => {
   vi.useRealTimers()
+  vi.unstubAllGlobals()
   while (cleanups.length) await cleanups.pop()!()
 })
 
@@ -1673,4 +1674,62 @@ it('reads credential-free device identity without minting a device', async () =>
   await storeAccount(f)
   await f.account.getProfile(clientMetadata())
   expect(await f.account.getDeviceIdentity()).toEqual({ deviceId, userId: 'test-user', osVersion: expect.any(String) as string })
+})
+
+/** Host with the account provider and an empty credential store; no Platform sign-in is involved. */
+async function apiKeyBalanceFixture() {
+  const home = await mkdtemp(join(tmpdir(), 'dsh-account-apikey-'))
+  cleanups.push(() => rm(home, { recursive: true, force: true }))
+  const ctx = new Context()
+  const authorization = ctx.plugin(AuthorizationService)
+  await authorization
+  const credentials = ctx.plugin(LocalCredentialProvider, { path: join(home, 'credentials.yaml'), watch: false })
+  await credentials
+  const provider = ctx.plugin(PlatformAccount, {
+    platformOrigin: 'https://platform.example',
+    inferenceOrigin: 'https://api.example',
+  })
+  await provider
+  cleanups.push(async () => { await provider.dispose(); await credentials.dispose(); await authorization.dispose() })
+  return { ctx, account: ctx.deepseekAccount as PlatformAccount }
+}
+
+it('reads the API-key wallet when no Platform grant is stored', async () => {
+  const f = await apiKeyBalanceFixture()
+  await f.ctx.credentials.set(credentialRef('DEEPSEEK_API_KEY'), 'sk-test')
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    is_available: true,
+    balance_infos: [{ currency: 'CNY', total_balance: '118.79', granted_balance: '21.01', topped_up_balance: '97.78' }],
+  }), { status: 200 }))
+  vi.stubGlobal('fetch', fetchMock)
+  expect(await f.account.getBalance(clientMetadata())).toEqual({
+    status: 'ready',
+    value: [{ currency: 'CNY', balance: '97.78' }],
+    bonusWallets: [{ currency: 'CNY', balance: '21.01' }],
+  })
+  expect(fetchMock).toHaveBeenCalledOnce()
+  const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+  expect(url).toBe('https://api.example/user/balance')
+  expect(init.headers).toEqual({ authorization: 'Bearer sk-test' })
+  expect(init.redirect).toBe('error')
+})
+
+it('never invents an API-key wallet without a key or after a rejected read', async () => {
+  const f = await apiKeyBalanceFixture()
+  const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+  vi.stubGlobal('fetch', fetchMock)
+  expect(await f.account.getBalance(clientMetadata())).toBeNull()
+  expect(fetchMock).not.toHaveBeenCalled()
+
+  await f.ctx.credentials.set(credentialRef('DEEPSEEK_API_KEY'), 'sk-test')
+  fetchMock.mockResolvedValueOnce(new Response('unauthorized', { status: 401 }))
+  expect(await f.account.getBalance(clientMetadata())).toEqual({ status: 'failed' })
+
+  fetchMock.mockRejectedValueOnce(new Error('offline'))
+  expect(await f.account.getBalance(clientMetadata())).toEqual({ status: 'failed' })
+
+  fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
+    is_available: true, balance_infos: [{ currency: 'CNY' }],
+  }), { status: 200 }))
+  expect(await f.account.getBalance(clientMetadata())).toEqual({ status: 'failed' })
 })

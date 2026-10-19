@@ -64,19 +64,79 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks() })
 
-it('keeps account UI and account RPC inactive in a plain browser, including after reload', async ({ start, mock }) => {
+it('keeps a plain browser free of account actions until the Host stores a credential', async ({ start, mock }) => {
   const c = await start()
   for (const reload of [false, true]) {
     if (reload) await c.reload(SELF)
     await c.flush()
+    // No launcher, account section, model sign-in choice, quota claim, or native page host.
     expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(0)
     expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(0)
     expect(c.ctx.slots.entries('settings.section').some(entry => entry.options.id === 'account')).toBe(false)
     expect(quotaNoticeEntry(c)).toBeUndefined()
     expect(platformHostEntry(c)).toBeUndefined()
-    expect(mock.log.calls().filter(call => call.endpoint.startsWith('account/'))).toEqual([])
-    expect(mock.log.streams().filter(stream => stream.endpoint.startsWith('account/'))).toEqual([])
+    // Signed out, the only account call is the model API key's optional wallet read.
+    expect(mock.log.calls().filter(call => call.endpoint === 'account/getProfile')).toEqual([])
+    expect(mock.log.calls().filter(call => call.endpoint === 'account/getBalance').length).toBeGreaterThan(0)
   }
+  expect(mock.log.streams().filter(stream => stream.endpoint === 'account/watch').length).toBeGreaterThan(0)
+}, 60_000)
+
+it('projects the model API-key wallet read-only in a plain browser', async ({ start }) => {
+  const c = await start()
+  const balance: AccountDetails['balance'] = {
+    status: 'ready', value: [{ currency: 'CNY', balance: '97.78' }], bonusWallets: [{ currency: 'CNY', balance: '21.01' }],
+  }
+  // A rejected read and an error envelope both surface the unavailable label.
+  c.mock.remote.account.getBalance.mockResolvedValueOnce({ ok: false, error: new RemoteError('gateway/internal', 'offline', {}) })
+  c.mock.streams.push('account/watch', view)
+  await vi.waitFor(() => { expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1) })
+  const actions = operations(c)
+  expect(actions.hooks.account.getSnapshot().details?.balance).toEqual({ status: 'failed' })
+  c.mock.remote.account.getBalance.mockRejectedValueOnce(new Error('offline'))
+  c.mock.streams.push('account/watch', view)
+  await c.flush()
+  expect(actions.hooks.account.getSnapshot().details?.balance).toEqual({ status: 'failed' })
+  // A stored API key projects the same wallet rows without an account session.
+  c.mock.remote.account.getBalance.mockResolvedValue(ok(balance))
+  c.mock.streams.push('account/watch', view)
+  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.balance).toEqual(balance) })
+  expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
+  expect(actions.readOnly).toBe(true)
+  // Re-entering Settings re-reads the wallet.
+  await actions.refreshAccount()
+  expect(c.mock.remote.account.getBalance).toHaveBeenCalled()
+}, 60_000)
+
+it('projects a stored account read-only in a plain browser', async ({ start }) => {
+  const c = await start()
+  const balance: AccountDetails['balance'] = {
+    status: 'ready', value: [{ currency: 'CNY', balance: '12.00' }], bonusWallets: [{ currency: 'CNY', balance: '5.00' }],
+  }
+  c.mock.remote.account.getProfile.mockResolvedValue(ok(profile))
+  c.mock.remote.account.getBalance.mockResolvedValue(ok(balance))
+  c.mock.remote.account.startSignIn.mockResolvedValue(ok(stored))
+  c.mock.streams.push('account/watch', stored)
+  await vi.waitFor(() => { expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1) })
+  const actions = operations(c)
+  expect(actions.readOnly).toBe(true)
+  expect(actions).not.toHaveProperty('openPlatformPage')
+  expect(c.ctx.slots.entries('settings.models.sign-in')).toHaveLength(0)
+  expect(c.ctx.slots.entries('settings.section').some(entry => entry.options.id === 'account')).toBe(true)
+  await vi.waitFor(() => { expect(actions.hooks.account.getSnapshot().details?.balance).toEqual(balance) })
+  // The hidden sign-in action still reports the browser login source.
+  await actions.start()
+  expect(c.mock.remote.account.startSignIn).toHaveBeenLastCalledWith(expect.anything(), expect.any(String), 'web')
+  // A second signed-in frame keeps the single launcher registration.
+  c.mock.streams.push('account/watch', stored)
+  await c.flush()
+  expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(1)
+  // A signed-in surface never reads the API-key wallet.
+  await actions.refreshAccount()
+  // Signing out returns the shell's own Settings trigger when no API key is stored.
+  c.mock.remote.account.getBalance.mockResolvedValue(ok(null))
+  c.mock.streams.push('account/watch', view)
+  await vi.waitFor(() => { expect(c.ctx.slots.entries('settings.launcher')).toHaveLength(0) })
 }, 60_000)
 
 it('claims account balance notices from the frame-wide quota chain and declines generic quota', async ({ start }) => {

@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for 2026-10-19-read-only-web-account-projection.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-10-19-read-only-web-account-projection.md
+/agent-note-read-only-account-projection-in-a-plain-browser:
+  en: d84ad21c58bb1051
+  zh: 03c05bb4fee75a77
+/agent-note-read-only-account-projection-in-a-plain-browser/problem:
+  en: 0137b0b1f1502c1b
+  zh: 2e79840d14a8113d
+/agent-note-read-only-account-projection-in-a-plain-browser/decision:
+  en: 1e108e087c0e3068
+  zh: daf142c3e5920ffa
+/agent-note-read-only-account-projection-in-a-plain-browser/alternatives-considered:
+  en: d633f06284a65d97
+  zh: 24ae51518ee5140f
+/agent-note-read-only-account-projection-in-a-plain-browser/consequences:
+  en: a0f270099981d63c
+  zh: 274280b59c5d27d5

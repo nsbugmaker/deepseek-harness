@@ -1,5 +1,5 @@
 ---
-description: "Desktop Account settings display DeepSeek login state and offer browser authorization and cancellation; the sidebar account menu provides Platform sign-out."
+description: "Account settings display DeepSeek login state and offer browser authorization; a plain browser projects a stored account read-only, and the sidebar account menu provides Platform sign-out."
 kind: "package-reference"
 ---
 
@@ -13,7 +13,7 @@ Server-expired account credentials clear the displayed account details and emit 
 
 ## Summary
 
-The Account settings section displays DeepSeek login state and offers browser sign-in and cancellation; the sidebar account menu provides Platform sign-out. Desktop users also receive a resumable introduction to account credit and presentation preferences.
+The Account settings section displays DeepSeek login state and offers browser sign-in and cancellation; the sidebar account menu provides Platform sign-out. A plain browser shows the stored account and its wallets read-only. Desktop users also receive a resumable introduction to account credit and presentation preferences.
 
 The sign-in dialog offers network troubleshooting only for `no-response` failures. HTTP, business, response-validation, storage, and account-stream failures retain the generic retry message.
 
@@ -28,9 +28,9 @@ A new account-model sign-in-required event displays “Model unavailable. Please
 <a id="use-this-package"></a>
 ## Use this package
 
-The client activates only inside Desktop, identified by its preload bridge. Plain Web clients keep the standard Settings launcher and API-key onboarding without account login, account settings, or an account-state subscription.
+The client activates in Desktop, identified by its preload bridge, and as a read-only projection in a plain browser. Desktop offers sign-in, sign-out, the model sign-in choice, the account quota notice, and the native Platform page; a plain browser shows the sidebar account launcher while the Host holds a credential or the model API key reports a wallet, and the Account settings section only with a credential, and never offers those actions. A browser without either keeps the standard Settings launcher and API-key onboarding.
 
-The sidebar and Account settings display circular profile images with diameters of 24px and 32px respectively, with the account icon as fallback when the URL is absent or the image fails to load. The collapsed sidebar centers the avatar in a 36 × 36 px button. Before sign-in the sidebar launcher shows a More row instead, leading with the ellipsis glyph.
+The sidebar and Account settings display circular profile images with diameters of 24px and 32px respectively, with the account icon as fallback when the URL is absent or the image fails to load. The collapsed sidebar centers the avatar in a 36 × 36 px button. Before sign-in the launcher shows the model API key's wallet total when one is available; otherwise it shows a More row leading with the ellipsis glyph.
 
 The section registers through settings.section and uses the account Remote namespace. The stream survives carrier reconnects through the shared Remote supervisor. The page renders feature-owned English and Chinese copy and keeps API keys separate from account state.
 
@@ -46,7 +46,7 @@ The account menu's Feedback entry opens the Feishu questionnaire in the system b
 
 Account profile and balance cards share the [settings card material and radius](../../../docs/web-styling.md#corner-radii-and-settings-cards). Usage and top-up links match standard Button geometry; authorization actions use the shared Button.
 
-The sidebar account menu uses the shared Menu surface and backdrop blur. The signed-in menu keeps the shared row typography; the signed-out menu carries its own wider rows. Both menus label the questionnaire entry Feedback. Its Settings row shows the effective key combination supplied by the shell. Opening the signed-in menu reads the account once and shows the recharge and granted wallet amounts above its rows, with granted wallets above zero only; a read still loading shows Loading, and a failed read keeps a Platform link there instead of a zero amount. Closing Settings returns focus to the sidebar account launcher.
+The sidebar account menu uses the shared Menu surface and backdrop blur. The signed-in menu keeps the shared row typography; the signed-out menu carries its own wider rows. Both menus label the questionnaire entry Feedback. Its Settings row shows the effective key combination supplied by the shell. Opening the signed-in menu reads the account once and shows the recharge and granted wallet amounts above its rows, with granted wallets above zero only; a read still loading shows Loading, an empty wallet list shows ¥0.00, and a failed read shows a plain unavailable label, so neither row links away. Closing Settings returns focus to the sidebar account launcher. A plain browser projects the signed-in menu without the Sign out row and never shows the Sign in row. Without an account credential, the same menu shows the wallet behind the model API key and the launcher summarizes its total in place of More; the same loading, empty, and failed rules apply.
 
 The account card’s More account information link has no underline and opens the root of the Host-provided Platform usage URL in the system browser, following `platformOrigin`.
 
@@ -79,7 +79,7 @@ Account login uses a dismissible dialog before the model onboarding credential e
 
 A terminal account-state stream failure appears in the sign-in dialog or Account settings. Plugin unload suppresses late failure reports.
 
-The balance card shows recharge funds and bonus credit in separate rows. While signed in, the bonus row appears during loading, after a failed wallet read, and when a wallet holds positive bonus credit; a successful read without positive bonus credit omits the row. A failed wallet read shows the existing unavailable copy as a link to Platform — the same destination and behavior as the Usage action, so the embedded page opens on Desktop and a new tab elsewhere — while the loading state stays plain text. Currencies retain their own amounts, and a notice date is rendered only inside the server’s own message.
+The balance card shows recharge funds and bonus credit in separate rows. While signed in, the bonus row appears during loading, after a failed wallet read, and when a wallet holds positive bonus credit; a successful read without positive bonus credit omits the row. A failed wallet read shows the unavailable copy as plain text, and a successful read with no recharge wallet shows ¥0.00, so neither balance row links away; usage and top-up keep their Platform links. Currencies retain their own amounts, and a notice date is rendered only inside the server’s own message.
 
 
 A successful login selects the first available `deepseek-account` model as the default when no other provider has a configured API key, even if a previous default was saved. Configured keys preserve the existing default even when their provider has no available models. Session-specific selections remain unchanged.
@@ -97,7 +97,7 @@ No model request prefix changes.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- Profile and recharge-wallet balances use the existing Platform Web endpoints through Host getProfile / getBalance. The page refreshes when opened and after login or reconnect, preserves server-masked contact data, and shows query failures independently without manufacturing a zero balance. Usage and top-up use Host-provided links derived from platformOrigin and the browser’s own login; the links never carry a DSH token.
+- Profile and recharge-wallet balances use the existing Platform Web endpoints through Host getProfile / getBalance; without an account grant, getBalance reads the model API key's own wallet from the inference origin's balance endpoint. The page refreshes when opened and after login or reconnect, preserves server-masked contact data, and shows query failures independently without manufacturing a zero balance. Usage and top-up use Host-provided links derived from platformOrigin and the browser’s own login; the links never carry a DSH token.
 - Completed installations do not reapply defaults or overwrite later user preferences. Completion does not synchronize across devices or create a per-account history.
 - Onboarding follows the interface locale and theme, with four Figma PNG illustration sets covering Chinese and English in light and dark appearance. Export canvases include the full illustration geometry; Finder artwork uses the same vertical fade in both themes.
 

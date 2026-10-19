@@ -15,6 +15,12 @@ const wallet = z.object({
   currency: z.enum(['CNY', 'USD']), balance: z.string().regex(decimal),
 })
 const summary = z.object({ normal_wallets: z.array(wallet), bonus_wallets: z.array(wallet) })
+// The model API key's own balance endpoint reports both wallet kinds per currency.
+const apiKeyWallet = z.object({
+  currency: z.enum(['CNY', 'USD']), granted_balance: z.string().regex(decimal),
+  topped_up_balance: z.string().regex(decimal),
+})
+const apiKeySummary = z.object({ is_available: z.boolean(), balance_infos: z.array(apiKeyWallet) })
 const bonus = z.object({
   order_id: z.uuid(), campaign: z.string(), amount: z.string().regex(decimal),
   currency: z.enum(['CNY', 'USD']), granted_at: z.string(), expires_at: z.string(), msg: z.string(),
@@ -34,6 +40,22 @@ export function profile(value: unknown): AccountProfile {
     id: parsed.data.id == null ? null : parsed.data.id as AccountUserId,
     avatarUrl: identity?.picture || null,
     name: identity?.name || null, contact: mobile || mobileNumber || email || null,
+  }
+}
+
+/**
+ * Project the model API key's balance response to the wallet projection the account UI renders.
+ * @param value - payload of the inference origin's `/user/balance` endpoint.
+ * @returns the topped-up amount as the recharge wallet and the granted amount as the bonus wallet.
+ * @throws {PlatformAuthError} when the payload does not carry the endpoint's fields.
+ */
+export function apiKeyBalance(value: unknown): Extract<AccountDetails['balance'], { status: 'ready' }> {
+  const parsed = apiKeySummary.safeParse(value)
+  if (!parsed.success) throw new PlatformAuthError('protocol')
+  return {
+    status: 'ready',
+    value: parsed.data.balance_infos.map(info => ({ currency: info.currency, balance: info.topped_up_balance })),
+    bonusWallets: parsed.data.balance_infos.map(info => ({ currency: info.currency, balance: info.granted_balance })),
   }
 }
 

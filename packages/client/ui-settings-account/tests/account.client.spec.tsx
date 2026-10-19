@@ -36,6 +36,7 @@ function operationsOf(state: Omit<AccountView, 'links'>, details?: Partial<Accou
     hasRunningAccountTasks: vi.fn(async () => false),
     contactUs: vi.fn(), showLogin: vi.fn(), setOnboarding: vi.fn(),
     bonusNoticeShown: vi.fn(), bonusNoticeDismissed: vi.fn(),
+    readOnly: false,
     refreshAccount: vi.fn(() => Promise.resolve()),
     start: vi.fn(() => Promise.resolve()), cancel: vi.fn(() => Promise.resolve()), signOut: vi.fn(() => Promise.resolve()),
   }
@@ -172,7 +173,7 @@ it.each([en, zh])('reads once when the menu opens and shows the wallet summary i
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
-it('links to Platform instead of inventing a balance when the wallet read failed', async () => {
+it('marks a failed wallet read without inventing a balance or a link', async () => {
   const operations = mount({ status: 'credential-stored', attempt: null }, en, { balance: { status: 'failed' } })
   cleanup()
   const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
@@ -181,7 +182,114 @@ it('links to Platform instead of inventing a balance when the wallet read failed
     useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
     t={key => en[key as AccountKey]} />)
   fireEvent.click(screen.getByRole('button', { name: en.menu }))
-  expect(screen.getByRole('link', { name: en.balanceUnavailable }).getAttribute('href')).toBe('http://localhost:8081/usage')
+  const menu = screen.getByRole('menu')
+  expect(within(menu).getByText(en.balanceFailed)).toBeTruthy()
+  expect(within(menu).queryByRole('link')).toBeNull()
+})
+
+it('shows a zero amount when the wallet read returns no wallets', async () => {
+  const operations = mount({ status: 'credential-stored', attempt: null }, en, {
+    balance: { status: 'ready', value: [], bonusWallets: [] },
+  })
+  cleanup()
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  fireEvent.click(screen.getByRole('button', { name: en.menu }))
+  expect(within(screen.getByRole('menu')).getByText('¥0.00')).toBeTruthy()
+  expect(screen.queryByRole('link')).toBeNull()
+})
+
+it('shows the stored account read-only without sign-out or sign-in actions', async () => {
+  const operations = operationsOf({ status: 'credential-stored', attempt: null }, {
+    balance: { status: 'ready', bonusWallets: [{ currency: 'CNY', balance: '5.00' }], value: [{ currency: 'CNY', balance: '12.00' }] },
+  })
+  operations.readOnly = true
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  fireEvent.click(screen.getByRole('button', { name: en.menu }))
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([en.settings, en.contactUs])
+  const menu = screen.getByRole('menu')
+  expect(menu.textContent).toContain('¥12.00')
+  expect(menu.textContent).toContain('¥5.00')
+  // Neither account dialog can open on this surface.
+  expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it('keeps the read-only launcher free of a sign-in action when signed out', async () => {
+  const operations = operationsOf({ status: 'signed-out', attempt: null })
+  operations.readOnly = true
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  fireEvent.click(screen.getByRole('button', { name: en.menu }))
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([en.settings, en.contactUs])
+  expect(screen.queryByRole('menuitem', { name: en.signIn })).toBeNull()
+})
+
+it('shows the model API-key wallet on a signed-out read-only launcher', async () => {
+  const operations = operationsOf({ status: 'signed-out', attempt: null }, {
+    balance: { status: 'ready', bonusWallets: [{ currency: 'CNY', balance: '21.01' }], value: [{ currency: 'CNY', balance: '97.78' }] },
+  })
+  operations.readOnly = true
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  const trigger = screen.getByRole('button', { name: en.menu })
+  // The launcher summarizes recharge and granted amounts in one total.
+  expect(trigger.textContent).toContain('¥118.79')
+  fireEvent.click(trigger)
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([en.settings, en.contactUs])
+  const menu = screen.getByRole('menu')
+  expect(menu.textContent).toContain('¥97.78')
+  expect(menu.textContent).toContain('¥21.01')
+})
+
+it('marks an unavailable API-key wallet on the launcher', async () => {
+  const operations = operationsOf({ status: 'signed-out', attempt: null }, { balance: { status: 'failed' } })
+  operations.readOnly = true
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  const trigger = screen.getByRole('button', { name: en.menu })
+  expect(trigger.textContent).toContain(en.balanceFailed)
+  fireEvent.click(trigger)
+  expect(screen.getByRole('menu').textContent).toContain(en.balanceFailed)
+  expect(screen.queryByRole('link')).toBeNull()
+})
+
+it('shows a zero or dollar API-key total on the launcher', async () => {
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  const empty = operationsOf({ status: 'signed-out', attempt: null }, {
+    balance: { status: 'ready', value: [], bonusWallets: [] },
+  })
+  empty.readOnly = true
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...empty} settingsOpen={false}
+    useAccount={selector => selector(empty.hooks.account.getSnapshot())}
+    useTheme={selector => selector(empty.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  expect(screen.getByRole('button', { name: en.menu }).textContent).toContain('¥0.00')
+  cleanup()
+  const usd = operationsOf({ status: 'signed-out', attempt: null }, {
+    balance: { status: 'ready', value: [{ currency: 'USD', balance: '20.07' }], bonusWallets: [{ currency: 'USD', balance: '0.000001' }] },
+  })
+  usd.readOnly = true
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...usd} settingsOpen={false}
+    useAccount={selector => selector(usd.hooks.account.getSnapshot())}
+    useTheme={selector => selector(usd.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  expect(screen.getByRole('button', { name: en.menu }).textContent).toContain('$20.07')
 })
 
 it.each([en, zh])('updates the Settings menu keycaps and accessible combination from its owner', async (copy) => {
@@ -397,7 +505,7 @@ it('shows the profile while the balance is still loading', async () => {
   expect(screen.getByText('Ready User')).toBeTruthy()
   // Both the recharge and the bonus row report their own pending read.
   expect(screen.getAllByText(en.loading)).toHaveLength(2)
-  expect(screen.queryByText(en.balanceUnavailable)).toBeNull()
+  expect(screen.queryByText(en.balanceFailed)).toBeNull()
   await expect(`${screen.getByRole('region').textContent}\n`).toMatchFileSnapshot('./expected/profile-before-balance.txt')
 })
 
@@ -563,33 +671,29 @@ it.each(['failed', 'expired'] as const)('allows a new sign-in after the attempt 
   expect(screen.getByRole('button', { name: en.signIn }).hasAttribute('disabled')).toBe(false)
 })
 
-it('shows unavailable details and keeps external Platform links usable in a browser', () => {
+it('shows unavailable details without a balance link in a browser', () => {
   mount({ status: 'credential-stored', attempt: null }, en, {
     profile: { status: 'failed' }, balance: { status: 'failed' },
   })
   expect(screen.getByText(en.profileUnavailable)).toBeTruthy()
-  // The failed read keeps its copy in both balance rows, now as links into Platform.
-  const unavailable = screen.getAllByRole('link', { name: en.balanceUnavailable })
-  expect(unavailable).toHaveLength(2)
-  for (const link of unavailable) expect(link.getAttribute('href')).toBe('http://localhost:8081/usage')
-  for (const name of [en.usage, en.topUp, en.balanceUnavailable]) {
+  // The failed read keeps its copy in both balance rows, without a Platform link.
+  expect(screen.getAllByText(en.balanceFailed)).toHaveLength(2)
+  expect(screen.queryByRole('link', { name: en.balanceFailed })).toBeNull()
+  for (const name of [en.usage, en.topUp]) {
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
     screen.getAllByRole('link', { name })[0]!.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(false)
   }
 })
 
-it('opens the embedded Platform page from a failed balance row on Desktop', async () => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
-  const platform: PlatformBridge = { open: vi.fn(async () => {}), setBounds: vi.fn(async () => {}), close: vi.fn(async () => {}) }
-  mount({ status: 'credential-stored', attempt: null }, en, { balance: { status: 'failed' } }, platform)
-  // Both failed rows reach the same destination as the Usage action, so the user can
-  // inspect the balance the Harness could not load without leaving the app.
-  await act(async () => { fireEvent.click(screen.getAllByRole('link', { name: en.balanceUnavailable })[0]!) })
-  expect(platform.open).toHaveBeenCalledWith('usage', expect.anything())
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name: en.backToHarness })) })
-  expect(platform.close).toHaveBeenCalledOnce()
-  expect(screen.queryByRole('button', { name: en.backToHarness })).toBeNull()
+it('shows a zero balance when the wallet read returns no wallets', () => {
+  mount({ status: 'credential-stored', attempt: null }, en, {
+    balance: { status: 'ready', value: [], bonusWallets: [] },
+  })
+  expect(screen.getByText('¥0.00')).toBeTruthy()
+  expect(screen.queryByText(en.balanceFailed)).toBeNull()
+  // A successful read without positive bonus omits the bonus row.
+  expect(screen.queryByText(en.bonusBalance)).toBeNull()
 })
 
 it('reports a rejected settings login and disables login while initial state is unavailable', async () => {

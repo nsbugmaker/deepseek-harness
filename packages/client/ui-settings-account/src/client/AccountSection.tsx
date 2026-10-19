@@ -52,6 +52,8 @@ export interface AccountSectionInjected {
     /** Palette the Platform login pages follow. */
     theme: HostObservable<ThemeSnapshot>
   }
+  /** Whether this surface may start or end a Platform sign-in; a plain browser projects the stored account read-only. */
+  readOnly: boolean
   /**
    * Read the balance, bonus wallets and unnotified bonus once. The Settings launcher
    * calls it on each entry, and a page opener on return from top-up.
@@ -121,12 +123,10 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
     if (openPlatformPage !== undefined && signedIn) { event.preventDefault(); showPage(openPlatformPage, 'usage') }
   }
   /**
-   * The Platform entry the balance rows share with the Usage action: an embedded page on
-   * Desktop, a new tab elsewhere. A wallet read that failed still reaches the same
-   * destination, so the user can inspect the balance the Harness could not load; the
+   * The Platform Usage entry: an embedded page on Desktop, a new tab elsewhere. The
    * destination comes from the account links, not from the wallet response.
    * @param label - localized link copy.
-   * @param className - link treatment for the row that renders it, absent when the sheet has no such rule.
+   * @param className - link treatment for the row that renders it.
    * @returns the Platform anchor.
    */
   const platformLink = (label: string, className: string | undefined) => (
@@ -176,13 +176,15 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
       <div className={css.balanceCard}>
         <div className={css.row}>
           <span>{t('balance')}</span>
-          {signedIn && wallets !== undefined && wallets.length > 0
-            ? <span className={css.amount}>{wallets.map(wallet => <span key={wallet.currency}>
-              {formatBalance(wallet.balance, wallet.currency === 'CNY' ? '¥' : '$')}
-            </span>)}</span>
+          {signedIn && wallets !== undefined
+            ? <span className={css.amount}>{wallets.length === 0
+              ? formatBalance('0', '¥')
+              : wallets.map(wallet => <span key={wallet.currency}>
+                {formatBalance(wallet.balance, wallet.currency === 'CNY' ? '¥' : '$')}
+              </span>)}</span>
             : !signedIn || details?.balance === undefined
               ? <span className={css.unavailable}>{t(!signedIn ? 'balanceSignedOut' : 'loading')}</span>
-              : platformLink(t('balanceUnavailable'), css.unavailableLink)}
+              : <span className={css.unavailable}>{t('balanceFailed')}</span>}
         </div>
         {signedIn && showBonusRow && <>
           <div className={css.divider} />
@@ -195,7 +197,7 @@ export function AccountSection({ t, useAccount, useTheme, start, cancel, openPla
                 </span>)}</span>
                 : details?.balance === undefined
                   ? <span className={css.unavailable}>{t('loading')}</span>
-                  : platformLink(t('balanceUnavailable'), css.unavailableLink)}
+                  : <span className={css.unavailable}>{t('balanceFailed')}</span>}
             </span>
           </div>
         </>}
