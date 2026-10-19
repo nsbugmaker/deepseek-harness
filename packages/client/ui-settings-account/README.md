@@ -46,7 +46,7 @@ The account menu's Feedback entry opens the Feishu questionnaire in the system b
 
 Account profile and balance cards share the [settings card material and radius](../../../docs/web-styling.md#corner-radii-and-settings-cards). Usage and top-up links match standard Button geometry; authorization actions use the shared Button.
 
-The sidebar account menu uses the shared Menu surface and backdrop blur. The signed-in menu keeps the shared row typography; the signed-out menu carries its own wider rows. Both menus label the questionnaire entry Feedback. Its Settings row shows the effective key combination supplied by the shell. Closing Settings returns focus to the sidebar account launcher.
+The sidebar account menu uses the shared Menu surface and backdrop blur. The signed-in menu keeps the shared row typography; the signed-out menu carries its own wider rows. Both menus label the questionnaire entry Feedback. Its Settings row shows the effective key combination supplied by the shell. Opening the signed-in menu reads the account once and shows the recharge and granted wallet amounts above its rows, with granted wallets above zero only; a read still loading shows Loading, and a failed read keeps a Platform link there instead of a zero amount. Closing Settings returns focus to the sidebar account launcher.
 
 The account card’s More account information link has no underline and opens the root of the Host-provided Platform usage URL in the system browser, following `platformOrigin`.
 

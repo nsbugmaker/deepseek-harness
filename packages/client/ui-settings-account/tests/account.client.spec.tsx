@@ -147,6 +147,43 @@ it.each([en, zh].flatMap(copy => ([false, true, 'unknown'] as const).map(running
   expect(screen.queryByRole('menu')).toBeNull()
 })
 
+it.each([en, zh])('reads once when the menu opens and shows the wallet summary it holds', async (copy) => {
+  const operations = mount({ status: 'credential-stored', attempt: null }, copy, {
+    profile: { status: 'ready', value: { id: null, name: 'User', contact: null } },
+    balance: { status: 'ready', bonusWallets: [{ currency: 'CNY', balance: '5.00' }], value: [{ currency: 'CNY', balance: '1234.56000000' }] },
+  })
+  cleanup()
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => key in copy ? copy[key as AccountKey] : key} />)
+  const trigger = screen.getByRole('button', { name: copy.menu })
+  fireEvent.click(trigger)
+  // Opening reads the account once; the row renders what that read holds.
+  expect(operations.refreshAccount).toHaveBeenCalledOnce()
+  expect(screen.getByText('¥1,234.56')).toBeTruthy()
+  expect(screen.getByText('¥5.00')).toBeTruthy()
+  expect(screen.getByRole('menu').textContent).toContain(copy.balance)
+  expect(screen.getByRole('menu').textContent).toContain(copy.bonusBalance)
+  // Toggling the menu closed is not a second entry, so it reads nothing.
+  fireEvent.click(trigger)
+  expect(operations.refreshAccount).toHaveBeenCalledOnce()
+  expect(screen.queryByRole('menu')).toBeNull()
+})
+
+it('links to Platform instead of inventing a balance when the wallet read failed', async () => {
+  const operations = mount({ status: 'credential-stored', attempt: null }, en, { balance: { status: 'failed' } })
+  cleanup()
+  const { AccountMenu } = await import('../src/client/AccountMenu.tsx')
+  render(<AccountMenu {...({} as GlobalStandardProps)} {...operations} settingsOpen={false}
+    useAccount={selector => selector(operations.hooks.account.getSnapshot())}
+    useTheme={selector => selector(operations.hooks.theme.getSnapshot())} wide openOnboarding={() => {}} openSettings={() => {}}
+    t={key => en[key as AccountKey]} />)
+  fireEvent.click(screen.getByRole('button', { name: en.menu }))
+  expect(screen.getByRole('link', { name: en.balanceUnavailable }).getAttribute('href')).toBe('http://localhost:8081/usage')
+})
+
 it.each([en, zh])('updates the Settings menu keycaps and accessible combination from its owner', async (copy) => {
   const operations = mount({ status: 'signed-out', attempt: null }, copy)
   cleanup()
@@ -189,6 +226,8 @@ it.each([en, zh])('offers settings, contact and sign-in from the signed-out acco
   expect(trigger.querySelector('svg')).not.toBeNull()
   fireEvent.click(trigger)
   expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([copy.settings, copy.contactUs, copy.signIn])
+  // Signed out there is no wallet to summarize, so the row stays absent.
+  expect(screen.queryByText(copy.balance)).toBeNull()
   await expect(`${screen.getByRole('menu').textContent}\n`).toMatchFileSnapshot(`./expected/menu-signed-out-${copy === en ? 'en' : 'zh'}.txt`)
   fireEvent.click(screen.getByRole('menuitem', { name: copy.settings }))
   expect(openSettings).toHaveBeenCalledOnce()

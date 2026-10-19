@@ -32,3 +32,19 @@
 }
 
 .signedOutMenu [role='menuitem'] > span:first-child:not(:last-child) svg { width: 16px; height: 16px; }
+
+/* Wallet summary inside the signed-in menu. The menu list renders its owner's
+   children after the action rows, so this block orders itself first visually
+   while the keyboard walk keeps following DOM order. */
+.balance { order: -1; display: flex; flex-direction: column; gap: 2px; margin: 0 0 3px; padding: 6px 8px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.balanceRow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 20px; }
+.balanceLabel { flex: none; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }
+.balanceAmount { display: flex; flex-wrap: wrap; justify-content: flex-end; font-weight: 510; font-variant-numeric: tabular-nums; }
+.balanceAmount > span + span::before { content: ' + '; white-space: pre; }
+.balancePending { color: var(--dsw-alias-label-tertiary); }
+
+/* A failed wallet read keeps the same muted copy as the settings sheet, but as a
+   link to the Platform entry the balance rows share. */
+.balanceLink { color: var(--dsw-alias-label-tertiary); text-decoration: underline; text-underline-offset: 3px; }
+.balanceLink:hover { color: var(--dsw-alias-label-primary); }
+.balanceLink:focus-visible { outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 2px; border-radius: 4px; }
