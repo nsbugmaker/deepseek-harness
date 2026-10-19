@@ -93,7 +93,7 @@ async function launchElectron(): Promise<void> {
 async function main(): Promise<void> {
   const { values } = parseArgs({ options: { 'skip-build': { type: 'boolean', default: false } } })
   if (!values['skip-build']) {
-    await runPackageScript('build', REPOSITORY_ROOT)
+    await runPackageScript('build:artifacts', REPOSITORY_ROOT)
     await runPackageScript('build', APP_ROOT)
   }
   for (const path of [
@@ -109,7 +109,8 @@ async function main(): Promise<void> {
     version,
     hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
     nodeVersion: execFileSync(createRequire(import.meta.url)('electron') as string, ['-p', 'process.versions.node'],
-      { encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }).trim(),
+      // A piped stdin fails with EBUSY on hosts that block synchronous pipe creation, so keep stdin unattached.
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }).trim(),
     pnpmVersion,
   }
   prepareDevelopmentProject({
