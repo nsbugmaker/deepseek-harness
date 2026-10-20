@@ -15,6 +15,8 @@ const wallet = z.object({
   currency: z.enum(['CNY', 'USD']), balance: z.string().regex(decimal),
 })
 const summary = z.object({ normal_wallets: z.array(wallet), bonus_wallets: z.array(wallet) })
+// Protocol responses are JSON-decoded; metadata keeps any JSON value without field validation.
+const bonusMetadata = z.custom<Exclude<AccountBonusNotification['campaign'], undefined>>().optional()
 // The model API key's own balance endpoint reports both wallet kinds per currency.
 const apiKeyWallet = z.object({
   currency: z.enum(['CNY', 'USD']), granted_balance: z.string().regex(decimal),
@@ -45,6 +47,17 @@ function projectProfile(value: z.infer<typeof user>): AccountProfile {
     avatarUrl: identity?.picture || null,
     name: identity?.name || null, contact: mobile || mobileNumber || email || null,
   }
+}
+
+function accountPayload<T>(schema: z.ZodType<T>, value: unknown, field: 'profile' | 'balance' | 'bonus'): T {
+  const parsed = schema.safeParse(value)
+  if (!parsed.success) {
+    console.error(`[deepseek-account] ${field} schema rejected`, {
+      issues: parsed.error.issues.map(issue => ({ path: issue.path, code: issue.code })),
+    })
+    throw new PlatformAuthError('protocol')
+  }
+  return parsed.data
 }
 
 /**
