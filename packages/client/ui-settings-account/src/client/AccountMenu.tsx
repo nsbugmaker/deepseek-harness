@@ -10,7 +10,7 @@ import { SignOutDialog } from './SignOutDialog.tsx'
 import { SignInDialog } from './SignInDialog.tsx'
 import { LogoutIcon } from './LogoutIcon.tsx'
 import { AccountAvatar } from './AccountAvatar.tsx'
-import { AccountNoticeCard } from './AccountNotice.tsx'
+import { AccountNoticeStack } from './AccountNotice.tsx'
 import { formatBalance } from './formatBalance.ts'
 import css from './AccountMenu.module.css'
 
@@ -24,7 +24,7 @@ export type AccountMenuProps = PropsRuntime<'settings.launcher'> & PropsLocale<'
 export function AccountMenu({
   subscribeSessionExpired, subscribeModelSignInRequired, wide, settingsShortcut, openSettings, openOnboarding, settingsOpen,
   useAccount, useTheme, signOut, hasRunningAccountTasks, refreshAccount, readOnly, bonusNoticeShown, bonusNoticeDismissed,
-  contactUs, showLogin, start, cancel, t,
+  avatarFailed, contactUs, showLogin, start, cancel, t,
 }: AccountMenuProps) {
   const anchor = useRef<HTMLDivElement>(null)
   // The launcher outlives the panel, so a false-to-true edge is one Settings entry:
@@ -91,7 +91,7 @@ export function AccountMenu({
           setOpen(value => !value)
         }}>
         {signedIn
-          ? <span className={css.avatar}><AccountAvatar url={profile?.status === 'ready' ? profile.value.avatarUrl : null} /></span>
+          ? <span className={css.avatar}><AccountAvatar avatar={signedIn ? account.avatar : undefined} avatarFailed={avatarFailed} /></span>
           : balanceOnly
             ? <span className={css.avatar}><IconUserOutlineMedium size={16} /></span>
             : <IconEllipsisOutlineMedium size={14} />}
