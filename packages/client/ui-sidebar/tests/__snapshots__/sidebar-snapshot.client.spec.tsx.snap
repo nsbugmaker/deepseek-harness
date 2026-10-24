@@ -156,6 +156,22 @@ exports[`sidebar shell snapshots > renders Windows caption controls in expanded 
         </span>
       </button>
       <button
+        aria-label="Sync upstream"
+        class="iconButton"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          data-content="adb68519"
+          fill="none"
+          height="16"
+          stroke-width="1"
+          viewBox="0 0 16 16"
+          width="16"
+          xmlns="http://www.w3.org/2000/svg"
+        />
+      </button>
+      <button
         aria-label="Collapse sidebar"
         class="iconButton toggle"
         type="button"
@@ -408,6 +424,22 @@ exports[`sidebar shell snapshots > renders the expanded column (wordmark, capsul
         </span>
       </button>
       <button
+        aria-label="Sync upstream"
+        class="iconButton"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          data-content="adb68519"
+          fill="none"
+          height="16"
+          stroke-width="1"
+          viewBox="0 0 16 16"
+          width="16"
+          xmlns="http://www.w3.org/2000/svg"
+        />
+      </button>
+      <button
         aria-label="Collapse sidebar"
         class="iconButton toggle"
         type="button"
@@ -538,7 +570,7 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
                 <span
                   class="localBuildTitle"
                 >
-                  DSH 本地构建
+                  kk-dsh
                 </span>
                 <span
                   class="buildVersion"
@@ -549,6 +581,22 @@ exports[`sidebar shell snapshots > renders the expanded column in the default lo
             </div>
           </span>
         </span>
+      </button>
+      <button
+        aria-label="同步官方更改"
+        class="iconButton"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          data-content="adb68519"
+          fill="none"
+          height="16"
+          stroke-width="1"
+          viewBox="0 0 16 16"
+          width="16"
+          xmlns="http://www.w3.org/2000/svg"
+        />
       </button>
       <button
         aria-label="收起侧边栏"

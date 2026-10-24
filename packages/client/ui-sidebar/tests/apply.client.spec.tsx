@@ -33,10 +33,23 @@ async function bench(declare = true) {
   if (ctx === undefined) throw new Error('the sidebar fixture owner did not activate')
   await ctx.plugin(SlotRegistry).await()
   const layout = { toggleSidebar: vi.fn(), selectPanel: vi.fn() }
-  const uiWorkspace = { startSession: vi.fn() }
+  const uiWorkspace = { startSession: vi.fn(), openSession: vi.fn() }
+  const syncSession = {
+    beginSubmission: vi.fn(() => ({ requestId: 'sync-request', abandon: vi.fn() })),
+    prompt: vi.fn(async () => ({ ok: true })),
+  }
+  const sessions = {
+    create: vi.fn(async () => 'session-sync'),
+    using: vi.fn(async (
+      _target: string,
+      _options: { source: string },
+      operation: (reference: { binding: { session: typeof syncSession } }) => Promise<unknown>,
+    ) => operation({ binding: { session: syncSession } })),
+  }
   ctx.provide('shortcuts', { catalog: createSnapshotStore([]) } as never)
   ctx.provide('layout', layout)
   ctx.provide('uiWorkspace', uiWorkspace as never)
+  ctx.provide('sessions', sessions as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const slots = ctx.get('slots') as SlotRegistry
   if (declare) {
@@ -49,7 +62,7 @@ async function bench(declare = true) {
       SidebarFrame,
     )
   }
-  return { ctx, slots, layout, uiWorkspace }
+  return { ctx, slots, layout, uiWorkspace, sessions, syncSession }
 }
 
 describe('ui-sidebar apply', () => {
@@ -58,7 +71,7 @@ describe('ui-sidebar apply', () => {
   })
 
   it('declares only the services it uses', () => {
-    expect(inject).toEqual(['slots', 'layout', 'uiWorkspace', 'locale', 'shortcuts'])
+    expect(inject).toEqual(['slots', 'layout', 'uiWorkspace', 'locale', 'shortcuts', 'sessions'])
   })
 
   it('registers the shell and declares its child seats', async () => {
@@ -80,7 +93,7 @@ describe('ui-sidebar apply', () => {
     expect(leading[0]!.locale).toBe('sidebar')
     expect(leading[0]!.inject).toBe(b.slots.entries('sidebar')[0]!.inject)
     const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
-    expect(Object.keys(injected)).toEqual(['startSession', 'toggleSidebar', 'selectPanel', 'hooks'])
+    expect(Object.keys(injected)).toEqual(['startSession', 'startSync', 'toggleSidebar', 'selectPanel', 'hooks'])
     expect(injected.hooks.panels.getSnapshot()).toEqual([])
     expect(b.slots.entries('main')).toEqual([])
     // Both arms delegate to the Workspace UI's shared New Session action.
@@ -94,6 +107,25 @@ describe('ui-sidebar apply', () => {
     injected.selectPanel(panelId)
     expect(b.layout.selectPanel).toHaveBeenCalledExactlyOnceWith(panelId)
     expectTypeOf<Parameters<SidebarRootInjected['selectPanel']>[0]>().toEqualTypeOf<MainPanelId>()
+  })
+
+  it('sends the upstream-sync prompt as the first turn of its own Session', async () => {
+    const b = await bench()
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
+    injected.startSync()
+    await vi.waitFor(() => { expect(b.syncSession.prompt).toHaveBeenCalledOnce() })
+    expect(b.sessions.create).toHaveBeenCalledExactlyOnceWith({ cwd: 'D:\\deepseek-h' })
+    expect(b.uiWorkspace.openSession).toHaveBeenCalledExactlyOnceWith('session-sync')
+    expect(b.sessions.using).toHaveBeenCalledExactlyOnceWith(
+      'session-sync', { source: 'ui-sidebar-sync' }, expect.any(Function),
+    )
+    expect(b.syncSession.beginSubmission).toHaveBeenCalledExactlyOnceWith({
+      mode: 'queue', text: expect.stringContaining('dsh-sync.ps1'), attachments: [],
+    })
+    expect(b.syncSession.prompt).toHaveBeenCalledWith(
+      [{ type: 'text', text: expect.stringContaining('dsh-sync.ps1') }], 'queue', undefined, 'sync-request',
+    )
   })
 
   it('waits for the sidebar declaration before registering', async () => {

@@ -34,16 +34,47 @@ const NS = 'sidebar'
 
 interface WorkspaceNavigation {
   startSession(workspaceId?: Parameters<SidebarRootInjected['startSession']>[0]): void
+  /** Reveal a Session the sync starter created. */
+  openSession(sessionId: string): void
+}
+
+/**
+ * The upstream checkout the sync run operates in. Opening the Session on this
+ * directory keeps the agent's file and shell work inside its own workspace;
+ * the path is deployment detail of this fork, not a user preference.
+ */
+const SYNC_CWD = 'D:\\deepseek-h'
+
+/** The slice of the Client Session runtime the sync starter drives. */
+interface SyncSessionFace {
+  beginSubmission(input: { mode: 'queue'; text: string; attachments: readonly [] }): { requestId: string; abandon(): void }
+  prompt(
+    content: readonly { type: 'text'; text: string }[],
+    mode: 'queue',
+    signal: AbortSignal | undefined,
+    requestId: string,
+  ): Promise<{ ok: boolean }>
+}
+
+/** Structurally narrowed Session service: only creation, retention, and prompting are touched. */
+interface SyncSessions {
+  create(options: { cwd: string }): Promise<string>
+  using<T>(
+    target: string,
+    options: { source: string },
+    operation: (reference: { binding: { session: SyncSessionFace } }) => Promise<T>,
+  ): Promise<T>
 }
 
 /** Services required by the sidebar plugin. */
-export const inject = ['slots', 'layout', 'uiWorkspace', 'locale', 'shortcuts']
+export const inject = ['slots', 'layout', 'uiWorkspace', 'locale', 'shortcuts', 'sessions']
 
 /** Registers the sidebar shell and its service callbacks.
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
   const workspaceNavigation = ctx.get('uiWorkspace') as unknown as WorkspaceNavigation
+  const sessions = ctx.get('sessions') as unknown as SyncSessions
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-sidebar: dictionaries')
   const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
   const syncPanels = (): void => {
@@ -66,6 +97,22 @@ export function apply(ctx: ClientContext): void {
     // The shell's New Session button rides the Workspace UI's shared action
     // (current Session Workspace, then recent Workspace).
     startSession: (workspaceId) => { workspaceNavigation.startSession(workspaceId) },
+    // The sync button opens a normal Session on the checkout and sends the
+    // dry-run instruction as its first turn; the user follows it like any
+    // other conversation.
+    startSync: () => {
+      void (async () => {
+        const sessionId = await sessions.create({ cwd: SYNC_CWD })
+        workspaceNavigation.openSession(sessionId)
+        const text = ctx.locale.bind(NS)('sync.prompt')
+        await sessions.using(sessionId, { source: 'ui-sidebar-sync' }, async (reference) => {
+          const session = reference.binding.session
+          const submission = session.beginSubmission({ mode: 'queue', text, attachments: [] })
+          const result = await session.prompt([{ type: 'text', text }], 'queue', undefined, submission.requestId)
+          if (!result.ok) submission.abandon()
+        })
+      })().catch((reason: unknown) => { console.warn('upstream sync session failed:', reason) })
+    },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
     selectPanel: (id) => {
       if (id === 'plugins' || id === 'schedules') ctx.get('productAnalytics')?.track('sidebar_menu_click', { menu_name: id === 'plugins' ? 'plugin' : 'cron' })

@@ -19,7 +19,8 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
-  FishLogo, IconNewChatOutlineMedium, IconNewChatOutlineRegular, IconPanelLeftOutlineRegular, isDarwinDesktop, ShortcutKeys, Tooltip,
+  FishLogo, IconNewChatOutlineMedium, IconNewChatOutlineRegular, IconPanelLeftOutlineRegular, IconRefreshOutlineRegular,
+  isDarwinDesktop, ShortcutKeys, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
@@ -89,6 +90,7 @@ export function SidebarRoot({
   collapsed,
   width,
   startSession,
+  startSync,
   toggleSidebar,
   selectPanel,
   usePanels,
@@ -196,6 +198,22 @@ export function SidebarRoot({
     </Tooltip>
   )
 
+  // Upstream sync sits immediately left of the collapse toggle while the
+  // column is expanded. The 56px rail has no room for a second 36px control,
+  // and its toggle already restores the row that carries this button.
+  const sync = (
+    <Tooltip label={t('sync.label')} delayMs={500} side={captionTooltipSide}>
+      <button
+        type="button"
+        className={css.iconButton}
+        aria-label={t('sync.label')}
+        onClick={() => { startSync() }}
+      >
+        <IconRefreshOutlineRegular size={16} />
+      </button>
+    </Tooltip>
+  )
+
   return (
     <div
       ref={column}
@@ -212,7 +230,7 @@ export function SidebarRoot({
     >
       {/* macOS hiddenInset titlebar: the strip shares the row with the
           traffic lights and keeps the toggle at the sidebar's top-right. */}
-      {darwinDesktop && <div className={css.topStrip} data-window-drag>{toggle}</div>}
+      {darwinDesktop && <div className={css.topStrip} data-window-drag>{wide && sync}{toggle}</div>}
       <div className={css.logoRow} data-window-drag>
         {/* Expanded, the brand doubles as a New Session shortcut — except on
             macOS, where it stays part of the logo row's window-drag surface
@@ -252,7 +270,7 @@ export function SidebarRoot({
               </button>
             )
         })()}
-        {!darwinDesktop && toggle}
+        {!darwinDesktop && <>{wide && sync}{toggle}</>}
       </div>
 
       {/* The label fades before the hover/focus shortcut, including on translucent backgrounds. */}

@@ -121,6 +121,12 @@ export type SidebarRootInjected = {
    * recent Workspace, or clear into the New Session pure view when none exist.
    */
   startSession: (workspaceId?: WorkspaceId) => void
+  /**
+   * Open a Session in the upstream-sync directory and send its first prompt,
+   * which asks the agent to run the sync dry-run. Fork-local affordance; the
+   * Session is a normal conversation the user can follow and steer.
+   */
+  startSync: () => void
   /** Toggle the sidebar column through the layout service. */
   toggleSidebar: () => void
   /** Select the global panel addressed by a sidebar row. */
